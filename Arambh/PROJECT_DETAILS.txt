@@ -1,0 +1,49 @@
+ARAMBH Project Data and Component Overview
+
+1. Directories:
+   - src/pages: individual UI screens (Dashboard, InterviewLive, Settings, etc.)
+   - src/components: reusable pieces (Panel, MetricBox, FeedbackRow, etc.)
+   - src/layouts: application layouts (MainLayout, AuthLayout, Sidebar, Header)
+   - src/hooks: custom React hooks for metrics and camera access
+   - src/assets: static assets (icons, images if any)
+
+2. Key Dependencies:
+   - React + React Router
+   - Tailwind CSS for styling
+   - Framer Motion for animations
+   - Lucide React for icons
+
+3. Routing:
+   - Auth routes: /login, /signup, /reset-password
+   - Main routes wrapped with MainLayout: /dashboard, /profile, /settings, /system-test, /interview-setup, /interview-live, /interview-paused, /analysis-live, /analysis-playback, /reports, /report-view/:id, /admin, /admin-users, /admin-sessions
+   - Default redirect to /login
+
+4. Animation Pattern:
+   - containerVariants with staggerChildren
+   - itemVariants with opacity & y transition
+   - Buttons use whileHover and whileTap
+   - Headers use gradient text
+
+5. Data Flow:
+   - Speech metrics and confidence hooks provide live values
+   - Timer component handles elapsed seconds with pause/resume
+   - State maintained in pages for session control (isPaused, isSessionEnded, elapsedSeconds)
+   - Admin pages display static/mock data currently
+
+6. Database Schema (see DataSchema.jsx for formatted list)
+   - Users, Sessions, Speech Metrics, Confidence Metrics, Reports, Settings, Audit Logs
+
+7. Authentication:
+   - Forms for login, signup, reset; navigate to dashboard on success
+
+8. Styling:
+   - Dark theme with gradient backgrounds
+   - Responsive grid layouts (grid-cols-1 md:grid-cols-2 etc.)
+   - Buttons with colored gradients and hover states
+
+9. Additional notes:
+   - Header removed static title; displays icons only
+   - Pages now animated consistently
+   - Admin pages have hover/animation effects on tables
+
+This file is plain text and summarizes everything needed for understanding the project structure, data, and component behavior.

@@ -1,0 +1,215 @@
+// ReportView.jsx
+import { Download, Share2, ArrowLeft, TrendingUp } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useNavigate, useParams } from 'react-router-dom';
+import Panel from '../components/Panel';
+import MetricBox from '../components/MetricBox';
+
+export default function ReportView() {
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  const strengthsWeaknesses = {
+    strengths: ['Excellent eye contact', 'Clear speech delivery', 'Good examples', 'Confident demeanor'],
+    weaknesses: ['Could reduce filler words', 'Speak more slowly in complex topics', 'Hand movement control'],
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1, delayChildren: 0.1 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  };
+
+  return (
+    <motion.div
+      className="w-full"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <motion.button
+        onClick={() => navigate('/reports')}
+        className="flex items-center gap-2 text-slate-400 hover:text-slate-200 mb-6 transition"
+        whileHover={{ x: -5 }}
+      >
+        <ArrowLeft size={20} />
+        Back to Reports
+      </motion.button>
+
+      {/* Overall Score */}
+      <motion.div variants={itemVariants} initial="hidden" animate="visible">
+        <Panel className="mb-6">
+          <motion.div
+            className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.div
+              variants={itemVariants}
+              className="flex flex-col items-center justify-center"
+            >
+              <motion.div
+                className="relative w-40 h-40"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+              >
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="#334155" strokeWidth="4" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="#06b6d4"
+                    strokeWidth="4"
+                    strokeDasharray={`${282 * 0.82} 282`}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <p className="text-4xl font-bold text-cyan-400">82</p>
+                  <p className="text-sm text-slate-400">/100</p>
+                </div>
+              </motion.div>
+              <motion.p
+                className="mt-4 text-xl font-semibold"
+                variants={itemVariants}
+              >
+                Excellent Performance
+              </motion.p>
+            </motion.div>
+
+            <motion.div
+              className="space-y-4"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              <motion.div variants={itemVariants}>
+                <MetricBox label="Speech Accuracy" value="88%" good />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <MetricBox label="Confidence" value="82%" good />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <MetricBox label="Communication" value="85%" good />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <MetricBox label="Content Quality" value="80%" good />
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        </Panel>
+      </motion.div>
+
+      {/* Section Scores */}
+      <motion.div
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        transition={{ delay: 0.2 }}
+      >
+        <motion.div variants={itemVariants}>
+          <Panel>
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <TrendingUp className="text-green-400" size={20} />
+              Strengths
+            </h2>
+            <ul className="space-y-2">
+              {strengthsWeaknesses.strengths.map((strength, i) => (
+                <motion.li
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 + i * 0.1 }}
+                  className="text-green-400 text-sm"
+                >
+                  ✓ {strength}
+                </motion.li>
+              ))}
+            </ul>
+          </Panel>
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <Panel>
+            <h2 className="text-lg font-semibold mb-4">Areas to Improve</h2>
+            <ul className="space-y-2">
+              {strengthsWeaknesses.weaknesses.map((weakness, i) => (
+                <motion.li
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 + i * 0.1 }}
+                  className="text-yellow-400 text-sm"
+                >
+                  ⚠ {weakness}
+                </motion.li>
+              ))}
+            </ul>
+          </Panel>
+        </motion.div>
+      </motion.div>
+
+      {/* Session Summary */}
+      <motion.div variants={itemVariants} initial="hidden" animate="visible" transition={{ delay: 0.4 }}>
+        <Panel>
+          <h2 className="text-lg font-semibold mb-4">Session Summary</h2>
+          <motion.div
+            className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {[
+              { label: 'Duration', value: '5m 32s' },
+              { label: 'Questions', value: '5' },
+              { label: 'Completed', value: '4/5' },
+              { label: 'Date', value: '2024-02-15' },
+            ].map((item, idx) => (
+              <motion.div key={idx} variants={itemVariants}>
+                <p className="text-sm text-slate-400">{item.label}</p>
+                <p className="font-semibold">{item.value}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </Panel>
+      </motion.div>
+
+      {/* Actions */}
+      <motion.div
+        className="mt-6 flex flex-col sm:flex-row gap-4 justify-end"
+        variants={itemVariants}
+        initial="hidden"
+        animate="visible"
+        transition={{ delay: 0.5 }}
+      >
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition"
+        >
+          <Share2 size={18} />
+          Share
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition"
+        >
+          <Download size={18} />
+          Download PDF
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  );
+}
