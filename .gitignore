@@ -1,1 +1,7 @@
 backend/.env
+
+mongodb/data/
+mongodb/log/
+
+__pycache__/
+*.pyc
