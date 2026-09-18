@@ -12,19 +12,24 @@ export function useCamera(isEnabled = true) {
 
     const startCamera = async () => {
       try {
-        // Request camera with audio
+        // Speech recognition owns the microphone; this stream only needs video.
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: 'user',
             width: { ideal: 1280 },
             height: { ideal: 720 }
           },
-          audio: true
+          audio: false
         });
+
+        if (!isMounted) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
 
         streamRef.current = stream;
 
-        if (isMounted && videoRef.current) {
+        if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.onloadedmetadata = () => {
             if (isEnabled) {

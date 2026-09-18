@@ -2,6 +2,8 @@
 import { Play, Pause, Square, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Panel from "../components/Panel";
 import MetricBox from "../components/MetricBox";
 import FeedbackRow from "../components/FeedbackRow";
@@ -11,14 +13,37 @@ import TimerDisplay from "../components/TimerDisplay";
 import WebcamPanel from "../components/WebcamPanel";
 import { useSpeechMetrics } from "../hooks/useSpeechMetrics";
 import { useConfidenceScore } from "../hooks/useConfidenceScore";
+import { reportAPI, sessionAPI } from "../services/endpoints";
 
 export default function InterviewLive() {
-  const { wpm, fillerWords, clarity } = useSpeechMetrics();
-  const { eyeContact, facialExpression, handMovement, overallConfidence } = useConfidenceScore();
+  const { state } = useLocation();
+  const navigate = useNavigate();
+  const sessionId = state?.sessionId || null;
   const [isPaused, setIsPaused] = useState(false);
   const [isSessionEnded, setIsSessionEnded] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState(null);
+  const {
+    wpm,
+    fillerWords,
+    clarity,
+    isListening: isSpeechListening,
+    isSupported: isSpeechSupported,
+    error: speechError,
+    startListening,
+    isStarting: isSpeechStarting,
+    isWaitingForSpeech,
+    hasSpeechData,
+  } = useSpeechMetrics(!isPaused && !isSessionEnded);
+  const {
+    eyeContact,
+    blinkScore,
+    headStability,
+    overallConfidence,
+    isConnected: isCvConnected,
+    warnings,
+  } = useConfidenceScore(sessionId);
   useEffect(() => {
     let interval;
     if (!isPaused && !isSessionEnded) {
@@ -30,9 +55,39 @@ export default function InterviewLive() {
   }, [isPaused, isSessionEnded]);
 
   const handleStartNewSession = () => {
-    setIsPaused(false);
-    setIsSessionEnded(false);
-    setElapsedSeconds(0);
+    navigate('/interview-setup');
+  };
+
+  const handleEndSession = async () => {
+    if (sessionId) {
+      try {
+        await sessionAPI.completeSession(sessionId, {
+          duration: elapsedSeconds,
+          speechMetrics: { pace: wpm, fillers: fillerWords, clarity },
+        });
+      } catch (error) {
+        console.warn('[Session] Could not complete backend session:', error.message);
+      }
+    }
+    setIsSessionEnded(true);
+  };
+
+  const handleGenerateReport = async () => {
+    if (!sessionId) {
+      setReportError('This interview is not linked to a saved session');
+      return;
+    }
+    try {
+      setIsGeneratingReport(true);
+      setReportError(null);
+      const response = await reportAPI.generateReport(sessionId);
+      const reportId = response.data.data?._id;
+      if (reportId) navigate(`/report-view/${reportId}`);
+    } catch (error) {
+      setReportError(error.response?.data?.message || 'Could not generate the report');
+    } finally {
+      setIsGeneratingReport(false);
+    }
   };
 
   return (
@@ -67,9 +122,9 @@ export default function InterviewLive() {
             <h2 className="text-slate-300 text-sm mb-4">Speech Accuracy</h2>
             <SpeechMeter percent={clarity} />
             <div className="space-y-4">
-              <MetricBox label="Words Per Minute" value={`${wpm} WPM`} good />
+              <MetricBox label="Words Per Minute" value={wpm ? `${wpm} WPM` : 'Waiting for speech'} good={wpm > 0} />
               <MetricBox label="Filler Words Count" value={fillerWords} warn />
-              <MetricBox label="Clarity Score" value={`${clarity}%`} good />
+              <MetricBox label="Clarity Score" value={clarity ? `${clarity}%` : 'Waiting for speech'} good={clarity > 0} />
             </div>
           </Panel>
         </div>
@@ -77,14 +132,40 @@ export default function InterviewLive() {
         {/* CENTER - Webcam Panel (Larger) */}
         <div className="lg:col-span-8">
           <Panel className="h-full">
-            <WebcamPanel isEnabled={!isPaused && !isSessionEnded} isSessionEnded={isSessionEnded} isPaused={isPaused} />
+            <WebcamPanel isEnabled={!isPaused && !isSessionEnded} isSessionEnded={isSessionEnded} isPaused={isPaused} isCvConnected={isCvConnected} />
           </Panel>
 
           <Panel className="mt-6">
             <h3 className="text-slate-300 mb-4">Real-Time Feedback</h3>
-            <FeedbackRow text="Voice clarity detected" type="info" />
-            <FeedbackRow text="Excellent posture maintained" type="success" />
-            <FeedbackRow text="Maintain eye contact" type="warn" />
+            {speechError && (
+              <div className="rounded-xl border border-yellow-700 bg-yellow-900/30 px-4 py-3 text-yellow-400 flex items-center justify-between gap-4">
+                <span>{speechError}</span>
+                <button type="button" onClick={startListening} disabled={isSpeechStarting} className="rounded-lg bg-yellow-600 px-3 py-1 text-sm text-white hover:bg-yellow-500 disabled:cursor-wait disabled:opacity-60">
+                  {isSpeechStarting ? 'Starting...' : 'Enable Speech'}
+                </button>
+              </div>
+            )}
+            {!isSpeechSupported && !speechError && <FeedbackRow text="Speech recognition is unavailable in this browser" type="warn" />}
+            {isSpeechSupported && !isSpeechListening && !isSessionEnded && !speechError && (
+              <div className="rounded-xl border border-blue-700 bg-blue-900/30 px-4 py-3 text-blue-300 flex items-center justify-between gap-4">
+                <span>Start speech measurement to calculate WPM from your words</span>
+                <button type="button" onClick={startListening} disabled={isSpeechStarting} className="rounded-lg bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60">
+                  {isSpeechStarting ? 'Starting...' : 'Start Speech'}
+                </button>
+              </div>
+            )}
+            {isSpeechSupported && !speechError && !isSpeechListening && !isSessionEnded && (
+              <FeedbackRow text="Waiting for speech input" type="info" />
+            )}
+            {isSpeechListening && !hasSpeechData && <FeedbackRow text={isWaitingForSpeech ? 'Listening. Speak now to calculate WPM...' : 'Listening for speech input...'} type="info" />}
+            {isSpeechListening && hasSpeechData && <FeedbackRow text="Speech is being measured" type="info" />}
+            {!isCvConnected && <FeedbackRow text="CV analysis is connecting..." type="info" />}
+            {isCvConnected && warnings.length === 0 && (
+              <FeedbackRow text="Behavioral indicators are steady" type="success" />
+            )}
+            {warnings.map((warning) => (
+              <FeedbackRow key={warning} text={warning} type="warn" />
+            ))}
           </Panel>
         </div>
 
@@ -92,11 +173,11 @@ export default function InterviewLive() {
         <div className="lg:col-span-2">
           <Panel>
             <h2 className="text-slate-300 text-sm mb-4">Confidence Level</h2>
-            <ConfidenceMeter percent={overallConfidence} />
+            <ConfidenceMeter percent={overallConfidence} available={isCvConnected} />
             <div className="space-y-4">
-              <MetricBox label="Eye Contact" value={`${eyeContact}%`} good />
-              <MetricBox label="Facial Expression" value={`${facialExpression}%`} good />
-              <MetricBox label="Hand Movement" value={`${handMovement}%`} warn />
+              <MetricBox label="Eye Contact" value={isCvConnected ? `${eyeContact}%` : '--'} good={isCvConnected} />
+              <MetricBox label="Blink Behavior" value={isCvConnected ? `${blinkScore}%` : '--'} good={isCvConnected} />
+              <MetricBox label="Head Stability" value={isCvConnected ? `${headStability}%` : '--'} good={isCvConnected} />
             </div>
           </Panel>
         </div>
@@ -118,7 +199,7 @@ export default function InterviewLive() {
                   <Play size={18}/> Resume
                 </BtnGreen>
               )}
-              <BtnRed onClick={() => setIsSessionEnded(true)}>
+              <BtnRed onClick={handleEndSession}>
                 <Square size={18}/> End Session
               </BtnRed>
             </>
@@ -128,9 +209,10 @@ export default function InterviewLive() {
               <BtnGreen onClick={handleStartNewSession}>
                 <Play size={18}/> Start New Session
               </BtnGreen>
-              <BtnCyan>
+              <BtnCyan onClick={handleGenerateReport} disabled={isGeneratingReport}>
                 <FileText size={18}/> Generate Report
               </BtnCyan>
+              {reportError && <p className="basis-full text-sm text-red-400">{reportError}</p>}
             </>
           )}
         </div>
@@ -181,5 +263,5 @@ const BtnGreen = ({children, onClick}) =>
 const BtnRed = ({children, onClick}) =>
   <button onClick={onClick} className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl flex gap-2 transition">{children}</button>;
 
-const BtnCyan = ({children}) =>
-  <button className="bg-cyan-600 hover:bg-cyan-700 px-6 py-3 rounded-xl flex gap-2 transition">{children}</button>;
+const BtnCyan = ({children, onClick, disabled}) =>
+  <button onClick={onClick} disabled={disabled} className="bg-cyan-600 hover:bg-cyan-700 px-6 py-3 rounded-xl flex gap-2 transition disabled:cursor-wait disabled:opacity-60">{children}</button>;

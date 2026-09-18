@@ -155,7 +155,7 @@ exports.getReports = async (req, res) => {
 // @access  Private
 exports.getReportById = async (req, res) => {
   try {
-    const report = await Report.findById(req.params.id);
+    const report = await Report.findById(req.params.id).populate('sessionId');
 
     if (!report) {
       return res.status(404).json({

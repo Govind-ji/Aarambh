@@ -1,9 +1,40 @@
 // WebcamPanel.jsx
 import { useCamera } from '../hooks/useCamera';
 import { CheckCircle } from 'lucide-react';
+import { useEffect } from 'react';
 
-export default function WebcamPanel({ isEnabled = true, isSessionEnded = false, isPaused = false }) {
+const CV_MODULE_URL = import.meta.env.VITE_CV_MODULE_URL || 'http://localhost:5001';
+
+export default function WebcamPanel({ isEnabled = true, isSessionEnded = false, isPaused = false, isCvConnected = false }) {
   const { videoRef, isActive, error } = useCamera(isEnabled && !isSessionEnded);
+
+  useEffect(() => {
+    if (!isEnabled || isSessionEnded || !isActive) return undefined;
+
+    const captureFrame = () => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2 || video.videoWidth === 0) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        fetch(`${CV_MODULE_URL}/api/metrics/frame`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'image/jpeg' },
+          body: blob,
+        }).catch((uploadError) => {
+          console.warn('[CV Module] Frame upload failed:', uploadError.message);
+        });
+      }, 'image/jpeg', 0.7);
+    };
+
+    const interval = setInterval(captureFrame, 500);
+    captureFrame();
+    return () => clearInterval(interval);
+  }, [isEnabled, isSessionEnded, isActive, videoRef]);
 
   return (
     <div className="flex flex-col items-center gap-4 h-full">
@@ -28,7 +59,7 @@ export default function WebcamPanel({ isEnabled = true, isSessionEnded = false, 
           </div>
         )}
 
-        {(!isActive && !isSessionEnded) || ((!isEnabled || isPaused) && !isSessionEnded && (
+        {((!isActive && !isSessionEnded) || ((!isEnabled || isPaused) && !isSessionEnded)) && (
           <div className="flex flex-col items-center justify-center absolute inset-0 bg-gradient-to-br from-[#0b1220] to-[#101a30]">
             {!isEnabled || isPaused ? (
               <>
@@ -45,12 +76,14 @@ export default function WebcamPanel({ isEnabled = true, isSessionEnded = false, 
               </>
             )}
           </div>
-        ))}
+        )}
       </div>
 
       <p className="text-slate-400 text-sm font-semibold">Live Webcam Feed</p>
 
-      <BadgeGreen>● Live Behavioral Analysis {isSessionEnded ? 'Completed' : isEnabled && !isPaused ? 'Active' : 'Paused'}</BadgeGreen>
+      <BadgeGreen>
+        ● Behavioral Analysis {isSessionEnded ? 'Completed' : isEnabled && !isPaused ? isCvConnected ? 'Active' : 'Connecting' : 'Paused'}
+      </BadgeGreen>
     </div>
   );
 }

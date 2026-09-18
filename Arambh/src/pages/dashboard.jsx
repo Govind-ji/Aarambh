@@ -2,39 +2,48 @@
 import { TrendingUp, Award, CheckCircle, AlertCircle, BarChart3, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import Panel from "../components/Panel";
+import { sessionAPI } from "../services/endpoints";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const firstName = user?.firstName || 'User';
 
-  const stats = {
-    totalInterviews: 12,
-    avgScore: 78,
-    improvement: 15,
-    streakDays: 7,
-  };
+  useEffect(() => {
+    let isMounted = true;
+    const loadDashboard = async () => {
+      try {
+        const response = await sessionAPI.getSessions(1, 20, { status: "completed" });
+        const sessions = response.data.data || [];
+        const detailedSessions = await Promise.all(
+          sessions.map(async (session) => {
+            try {
+              const detail = await sessionAPI.getSessionById(session._id);
+              return detail.data.data || session;
+            } catch {
+              return session;
+            }
+          })
+        );
+        if (isMounted) setDashboardData(buildDashboardData(detailedSessions));
+      } catch {
+        if (isMounted) setDashboardData(buildDashboardData([]));
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+    loadDashboard();
+    return () => { isMounted = false; };
+  }, []);
 
-  const improvements = [
-    { metric: "Eye Contact", previous: 65, current: 82, change: "+17%" },
-    { metric: "Speech Clarity", previous: 72, current: 85, change: "+13%" },
-    { metric: "Body Language", previous: 58, current: 74, change: "+16%" },
-  ];
-
-  const yetToImprove = [
-    { metric: "Filler Words", target: "Reduce by 30%", progress: 45 },
-    { metric: "Speaking Pace", target: "120-150 WPM", progress: 60 },
-    { metric: "Hand Gestures", target: "More dynamic", progress: 35 },
-  ];
-
-  const recentSessions = [
-    { id: 1, date: "Feb 21, 2026", score: 82, duration: "15:30" },
-    { id: 2, date: "Feb 20, 2026", score: 78, duration: "14:45" },
-    { id: 3, date: "Feb 19, 2026", score: 75, duration: "16:00" },
-  ];
+  const data = dashboardData || buildDashboardData([]);
+  const { stats, improvements, yetToImprove, recentSessions, trend } = data;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -182,6 +191,7 @@ export default function Dashboard() {
               <h2 className="text-xl font-semibold">Things Improved</h2>
             </div>
             <div className="space-y-4">
+              {improvements.length === 0 && <p className="text-slate-400">Complete two interviews to see improvements.</p>}
               {improvements.map((item, idx) => (
                 <motion.div
                   key={idx}
@@ -226,6 +236,7 @@ export default function Dashboard() {
               <h2 className="text-xl font-semibold">Yet to Improve</h2>
             </div>
             <div className="space-y-4">
+              {yetToImprove.length === 0 && <p className="text-slate-400">No improvement areas recorded yet.</p>}
               {yetToImprove.map((item, idx) => (
                 <motion.div
                   key={idx}
@@ -263,6 +274,7 @@ export default function Dashboard() {
           <Panel>
             <h2 className="text-xl font-semibold mb-6">Recent Sessions</h2>
             <div className="space-y-3">
+              {recentSessions.length === 0 && <p className="text-slate-400">{isLoading ? "Loading sessions..." : "No completed sessions yet."}</p>}
               {recentSessions.map((session, idx) => (
                 <motion.button
                   key={session.id}
@@ -304,7 +316,7 @@ export default function Dashboard() {
         <Panel>
           <h2 className="text-2xl font-semibold mb-6">Performance Trend</h2>
           <div className="h-64 flex items-end gap-3 mb-4">
-            {[65, 68, 72, 70, 75, 78, 82].map((score, idx) => (
+            {trend.map((score, idx) => (
               <motion.div
                 key={idx}
                 initial={{ height: 0 }}
@@ -319,13 +331,7 @@ export default function Dashboard() {
             ))}
           </div>
           <div className="flex items-center justify-between text-slate-400 text-sm">
-            <span>Week 1</span>
-            <span>Week 2</span>
-            <span>Week 3</span>
-            <span>Week 4</span>
-            <span>Week 5</span>
-            <span>Week 6</span>
-            <span>Week 7</span>
+            {trend.map((_, idx) => <span key={idx}>Session {idx + 1}</span>)}
           </div>
         </Panel>
       </motion.div>
@@ -357,4 +363,74 @@ export default function Dashboard() {
       </motion.div>
     </div>
   );
+}
+
+function buildDashboardData(sessions) {
+  const completed = sessions
+    .filter((session) => session.status === 'completed')
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const first = completed[0];
+  const latest = completed[completed.length - 1];
+  const metric = (session, group, key) => session?.[group]?.[key] ?? 0;
+  const score = (session) => session?.overallScore || session?.confidenceScore || metric(session, 'confidenceMetricsId', 'overallConfidenceScore');
+  const firstScore = score(first);
+  const latestScore = score(latest);
+  const change = (current, previous) => Math.round(current - previous);
+  const pace = metric(latest, 'speechMetricsId', 'pace');
+  const fillers = metric(latest, 'speechMetricsId', 'fillers');
+  const clarity = metric(latest, 'speechMetricsId', 'clarity');
+  const eyeContact = metric(latest, 'confidenceMetricsId', 'eyeContact');
+  const paceProgress = pace ? Math.max(0, 100 - Math.min(100, Math.abs(pace - 135) / 1.35)) : 0;
+
+  return {
+    stats: {
+      totalInterviews: completed.length,
+      avgScore: completed.length ? Math.round(completed.reduce((sum, session) => sum + score(session), 0) / completed.length) : 0,
+      improvement: completed.length > 1 ? change(latestScore, firstScore) : 0,
+      streakDays: calculateStreak(completed),
+    },
+    improvements: completed.length > 1 ? [
+      { metric: 'Overall Confidence', previous: firstScore, current: latestScore, change: `${change(latestScore, firstScore) >= 0 ? '+' : ''}${change(latestScore, firstScore)}%` },
+      { metric: 'Eye Contact', previous: metric(first, 'confidenceMetricsId', 'eyeContact'), current: eyeContact, change: `${change(eyeContact, metric(first, 'confidenceMetricsId', 'eyeContact')) >= 0 ? '+' : ''}${change(eyeContact, metric(first, 'confidenceMetricsId', 'eyeContact'))}%` },
+      { metric: 'Speech Clarity', previous: metric(first, 'speechMetricsId', 'clarity'), current: clarity, change: `${change(clarity, metric(first, 'speechMetricsId', 'clarity')) >= 0 ? '+' : ''}${change(clarity, metric(first, 'speechMetricsId', 'clarity'))}%` },
+    ] : [],
+    yetToImprove: latest ? [
+      { metric: 'Filler Words', target: `${fillers} recorded in the latest session`, progress: Math.max(0, 100 - Math.min(100, fillers * 5)) },
+      { metric: 'Speaking Pace', target: pace ? `${pace} WPM (target 120-150)` : 'No WPM recorded', progress: paceProgress },
+      { metric: 'Eye Contact', target: `${eyeContact}% in the latest session`, progress: eyeContact },
+    ] : [],
+    recentSessions: completed.slice(-3).reverse().map((session) => ({
+      id: session._id,
+      date: new Date(session.endTime || session.createdAt).toLocaleDateString(),
+      score: Math.round(score(session)),
+      duration: formatDuration(session.duration),
+    })),
+    trend: completed.slice(-7).map((session) => Math.round(score(session))),
+  };
+}
+
+function formatDuration(seconds = 0) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
+function calculateStreak(sessions) {
+  if (sessions.length === 0) return 0;
+
+  const uniqueDays = [...new Set(sessions.map((session) => {
+    const date = new Date(session.endTime || session.createdAt);
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  }))].sort((a, b) => b - a);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const yesterdayStart = todayStart - 86400000;
+  if (uniqueDays[0] !== todayStart && uniqueDays[0] !== yesterdayStart) return 0;
+
+  let streak = 1;
+  for (let index = 1; index < uniqueDays.length; index += 1) {
+    if (uniqueDays[index - 1] - uniqueDays[index] !== 86400000) break;
+    streak += 1;
+  }
+  return streak;
 }

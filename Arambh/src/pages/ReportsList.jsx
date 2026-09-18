@@ -2,16 +2,17 @@
 import { FileText, Download, Eye, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import Panel from '../components/Panel';
+import { useReport } from '../hooks/useReport';
 
 export default function ReportsList() {
   const navigate = useNavigate();
-  const reports = [
-    { id: 1, title: 'Technical Interview - Q1', date: '2024-02-15', score: 82 },
-    { id: 2, title: 'Behavioral Interview', date: '2024-02-12', score: 78 },
-    { id: 3, title: 'Mixed Interview', date: '2024-02-10', score: 85 },
-    { id: 4, title: 'Follow-up Interview', date: '2024-02-08', score: 80 },
-  ];
+  const { reports, loading, error, fetchReports, deleteReport } = useReport();
+
+  useEffect(() => {
+    fetchReports().catch(() => {});
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -41,6 +42,9 @@ export default function ReportsList() {
             initial="hidden"
             animate="visible"
           >
+            {loading && <p className="text-slate-400">Loading reports...</p>}
+            {!loading && error && <p className="text-red-400">{error}</p>}
+            {!loading && !error && reports.length === 0 && <p className="text-slate-400">No reports generated yet.</p>}
             {reports.map((report, idx) => (
               <motion.div
                 key={report.id}
@@ -57,20 +61,20 @@ export default function ReportsList() {
                   </motion.div>
                   <div>
                     <p className="font-semibold">{report.title}</p>
-                    <p className="text-sm text-slate-400">{report.date}</p>
+                    <p className="text-sm text-slate-400">{new Date(report.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4 w-full md:w-auto">
                   <div className="text-right mr-4">
-                    <p className="text-2xl font-bold text-cyan-400">{report.score}</p>
+                    <p className="text-2xl font-bold text-cyan-400">{Math.round(report.overallScore || 0)}</p>
                     <p className="text-sm text-slate-400">/100</p>
                   </div>
 
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => navigate(`/report-view/${report.id}`)}
+                    onClick={() => navigate(`/report-view/${report._id}`)}
                     className="bg-blue-600 hover:bg-blue-700 p-2 rounded-lg transition"
                   >
                     <Eye size={18} />
@@ -87,6 +91,7 @@ export default function ReportsList() {
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
+                    onClick={() => deleteReport(report._id)}
                     className="bg-red-900/30 hover:bg-red-900/50 p-2 rounded-lg transition text-red-400"
                   >
                     <Trash2 size={18} />

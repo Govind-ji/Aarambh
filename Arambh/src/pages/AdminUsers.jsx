@@ -1,15 +1,29 @@
 // AdminUsers.jsx
-import { Trash2, Edit, Shield } from 'lucide-react';
+import { Trash2, Edit } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import Panel from '../components/Panel';
+import { adminAPI } from '../services/endpoints';
 
 export default function AdminUsers() {
-  const users = [
-    { id: 1, name: 'John Doe', email: 'john@example.com', role: 'User', interviews: 5, status: 'Active' },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'Admin', interviews: 12, status: 'Active' },
-    { id: 3, name: 'Mike Johnson', email: 'mike@example.com', role: 'User', interviews: 3, status: 'Inactive' },
-    { id: 4, name: 'Sarah Davis', email: 'sarah@example.com', role: 'User', interviews: 8, status: 'Active' },
-  ];
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const response = await adminAPI.getAllUsers(1, 100);
+        setUsers(response.data?.data || []);
+      } catch (requestError) {
+        setError(requestError.response?.data?.message || 'Unable to load registered users');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUsers();
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -42,6 +56,8 @@ export default function AdminUsers() {
 
       <motion.div variants={itemVariants} initial="hidden" animate="visible">
         <Panel>
+          {isLoading && <p className="p-4 text-slate-400">Loading registered users...</p>}
+          {error && <p className="p-4 text-red-400">{error}</p>}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -56,24 +72,24 @@ export default function AdminUsers() {
               </thead>
               <tbody>
                 <motion.tbody variants={containerVariants} initial="hidden" animate="visible">
-                  {users.map(user => (
+                  {!isLoading && !error && users.map(user => (
                     <motion.tr
-                      key={user.id}
+                      key={user._id}
                       variants={itemVariants}
                       className="border-b border-slate-700/50 hover:bg-slate-900/30 transition"
                       whileHover={{ x: 5 }}
                     >
-                      <td className="py-3 px-4 font-semibold">{user.name}</td>
+                      <td className="py-3 px-4 font-semibold">{user.firstName} {user.lastName}</td>
                       <td className="py-3 px-4 text-slate-400">{user.email}</td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-1 rounded bg-blue-900/30 text-blue-400 text-xs">
                           {user.role}
                         </span>
                       </td>
-                      <td className="py-3 px-4">{user.interviews}</td>
+                      <td className="py-3 px-4">{user.totalSessions || 0}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-1 rounded text-xs ${
-                          user.status === 'Active' 
+                          user.status === 'active'
                             ? 'bg-green-900/30 text-green-400' 
                             : 'bg-slate-900/30 text-slate-400'
                         }`}>

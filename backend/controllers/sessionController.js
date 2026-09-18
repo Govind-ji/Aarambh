@@ -273,7 +273,7 @@ exports.resumeSession = async (req, res) => {
 // @access  Private
 exports.completeSession = async (req, res) => {
   try {
-    const { transcription, feedback } = req.body;
+    const { transcription, feedback, duration, speechMetrics } = req.body;
 
     const session = await Session.findById(req.params.id);
 
@@ -293,10 +293,32 @@ exports.completeSession = async (req, res) => {
 
     session.status = 'completed';
     session.endTime = new Date();
-    session.duration = Math.floor((session.endTime - session.startTime) / 1000);
+    const requestedDuration = Number(duration);
+    const measuredDuration = session.startTime
+      ? Math.floor((session.endTime - session.startTime) / 1000)
+      : 0;
+    session.duration = Number.isFinite(requestedDuration) && requestedDuration > 0
+      ? Math.floor(requestedDuration)
+      : measuredDuration;
     
     if (transcription) session.transcription = transcription;
     if (feedback) session.feedback = feedback;
+
+    if (speechMetrics) {
+      const speech = await SpeechMetrics.findOneAndUpdate(
+        { sessionId: session._id, userId: req.user.id },
+        {
+          sessionId: session._id,
+          userId: req.user.id,
+          pace: Number(speechMetrics.pace) || 0,
+          fillers: Number(speechMetrics.fillers) || 0,
+          clarity: Number(speechMetrics.clarity) || 0,
+          overallScore: Number(speechMetrics.clarity) || 0,
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+      session.speechMetricsId = speech._id;
+    }
 
     await session.save();
 

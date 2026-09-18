@@ -3,9 +3,13 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const InterviewQuestion = require('../models/InterviewQuestion');
 
+const resolveMongoUri = () => {
+  return process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/arambh';
+};
+
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/arambh', {
+    await mongoose.connect(resolveMongoUri(), {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });

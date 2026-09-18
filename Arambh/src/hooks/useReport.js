@@ -29,7 +29,7 @@ export function useReport() {
       setLoading(true);
       setError(null);
       const response = await reportAPI.getReports(page, limit);
-      setReports(response.data.reports || []);
+      setReports(response.data.data || []);
       return response.data;
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch reports');

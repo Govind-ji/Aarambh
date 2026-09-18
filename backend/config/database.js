@@ -1,8 +1,12 @@
 const mongoose = require('mongoose');
 
+const resolveMongoUri = () => {
+  return process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/arambh';
+};
+
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/arambh', {
+    const conn = await mongoose.connect(resolveMongoUri(), {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
@@ -16,3 +20,4 @@ const connectDB = async () => {
 };
 
 module.exports = connectDB;
+module.exports.resolveMongoUri = resolveMongoUri;

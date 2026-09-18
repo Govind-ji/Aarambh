@@ -4,10 +4,12 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import Panel from '../components/Panel';
+import { sessionAPI } from '../services/endpoints';
 
 export default function InterviewSetup() {
   const navigate = useNavigate();
   const [allReady, setAllReady] = useState(true);
+  const [isStarting, setIsStarting] = useState(false);
 
   const requirements = [
     { icon: Video, label: 'Webcam Access', status: 'ready' },
@@ -93,13 +95,33 @@ export default function InterviewSetup() {
 
             <motion.button
               variants={itemVariants}
-              onClick={() => navigate('/interview-live')}
+              onClick={async () => {
+                setIsStarting(true);
+                try {
+                  const response = await sessionAPI.createSession({
+                    title: 'Live Interview',
+                    category: 'technical',
+                    difficulty: 'medium',
+                  });
+                  const sessionId = response.data?.data?._id;
+                  if (sessionId) {
+                    await sessionAPI.startSession(sessionId);
+                  }
+                  navigate('/interview-live', { state: { sessionId } });
+                } catch (error) {
+                  console.error('[Session] Could not create backend session:', error);
+                  navigate('/interview-live');
+                } finally {
+                  setIsStarting(false);
+                }
+              }}
+              disabled={isStarting}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition mt-6"
             >
               <Play size={20} />
-              Start Interview
+              {isStarting ? 'Starting...' : 'Start Interview'}
             </motion.button>
           </motion.div>
         </Panel>

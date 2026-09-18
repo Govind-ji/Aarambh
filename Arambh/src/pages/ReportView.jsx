@@ -2,17 +2,32 @@
 import { Download, Share2, ArrowLeft, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import Panel from '../components/Panel';
 import MetricBox from '../components/MetricBox';
+import { reportAPI } from '../services/endpoints';
 
 export default function ReportView() {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  const strengthsWeaknesses = {
-    strengths: ['Excellent eye contact', 'Clear speech delivery', 'Good examples', 'Confident demeanor'],
-    weaknesses: ['Could reduce filler words', 'Speak more slowly in complex topics', 'Hand movement control'],
-  };
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    reportAPI.getReportById(id)
+      .then((response) => setReport(response.data.data))
+      .catch((requestError) => setError(requestError.response?.data?.message || 'Could not load this report'));
+  }, [id]);
+
+  if (error) return <Panel><p className="text-red-400">{error}</p></Panel>;
+  if (!report) return <Panel><p className="text-slate-400">Loading report...</p></Panel>;
+
+  const overallScore = Math.round(report.overallScore || 0);
+  const strengths = report.strengths || [];
+  const weaknesses = report.areasForImprovement || [];
+  const session = report.sessionId && typeof report.sessionId === 'object' ? report.sessionId : {};
+  const duration = Number(session.duration || 0);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -71,11 +86,11 @@ export default function ReportView() {
                     fill="none"
                     stroke="#06b6d4"
                     strokeWidth="4"
-                    strokeDasharray={`${282 * 0.82} 282`}
+                    strokeDasharray={`${282 * (overallScore / 100)} 282`}
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <p className="text-4xl font-bold text-cyan-400">82</p>
+                  <p className="text-4xl font-bold text-cyan-400">{overallScore}</p>
                   <p className="text-sm text-slate-400">/100</p>
                 </div>
               </motion.div>
@@ -94,16 +109,13 @@ export default function ReportView() {
               animate="visible"
             >
               <motion.div variants={itemVariants}>
-                <MetricBox label="Speech Accuracy" value="88%" good />
+                <MetricBox label="Confidence" value={`${Math.round(report.confidenceScore || 0)}%`} good />
               </motion.div>
               <motion.div variants={itemVariants}>
-                <MetricBox label="Confidence" value="82%" good />
+                <MetricBox label="Communication" value={`${Math.round(report.contentScore || 0)}%`} good />
               </motion.div>
               <motion.div variants={itemVariants}>
-                <MetricBox label="Communication" value="85%" good />
-              </motion.div>
-              <motion.div variants={itemVariants}>
-                <MetricBox label="Content Quality" value="80%" good />
+                <MetricBox label="Content Quality" value={`${Math.round(report.contentAnalysis?.relevanceScore || 0)}%`} good />
               </motion.div>
             </motion.div>
           </motion.div>
@@ -125,7 +137,7 @@ export default function ReportView() {
               Strengths
             </h2>
             <ul className="space-y-2">
-              {strengthsWeaknesses.strengths.map((strength, i) => (
+              {strengths.map((strength, i) => (
                 <motion.li
                   key={i}
                   initial={{ opacity: 0, x: -20 }}
@@ -144,7 +156,7 @@ export default function ReportView() {
           <Panel>
             <h2 className="text-lg font-semibold mb-4">Areas to Improve</h2>
             <ul className="space-y-2">
-              {strengthsWeaknesses.weaknesses.map((weakness, i) => (
+              {weaknesses.map((weakness, i) => (
                 <motion.li
                   key={i}
                   initial={{ opacity: 0, x: -20 }}
@@ -171,10 +183,10 @@ export default function ReportView() {
             animate="visible"
           >
             {[
-              { label: 'Duration', value: '5m 32s' },
-              { label: 'Questions', value: '5' },
-              { label: 'Completed', value: '4/5' },
-              { label: 'Date', value: '2024-02-15' },
+              { label: 'Duration', value: `${Math.floor(duration / 60)}m ${duration % 60}s` },
+              { label: 'Pace', value: report.speechAnalysis?.paceSummary || 'Not recorded' },
+              { label: 'Fillers', value: report.speechAnalysis?.fillerCount ?? 0 },
+              { label: 'Date', value: new Date(report.createdAt).toLocaleDateString() },
             ].map((item, idx) => (
               <motion.div key={idx} variants={itemVariants}>
                 <p className="text-sm text-slate-400">{item.label}</p>
